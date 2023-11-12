@@ -1,6 +1,4 @@
-#ifndef ICP_HEADER
-
-#define ICP_HEADER
+#pragma once
 
 /* Version */
 #define ICP_VERSION_1           1   
@@ -58,5 +56,3 @@ typedef enum {
     ICP_OP_END			/* 24 marks end of opcodes */
 } icp_opcode;
 
-
-#endif  /* ICP_HEADER */
