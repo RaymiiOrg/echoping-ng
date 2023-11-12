@@ -229,9 +229,8 @@ int read_from_server ();
 int smtp_read_response_from_server ();
 #endif
 
+#endif
 
 extern char *progname;
 
-// extern boolean timeout_flag;
-
-#endif
+extern boolean timeout_flag;
