@@ -1,7 +1,7 @@
+#pragma once
+
 /* $Id$ */
 
-#ifndef HEADER_INCLUDED
-#define HEADER_INCLUDED
 
 /* Settings you should not change -- see below for changeable ones */
 
@@ -229,8 +229,6 @@ int read_from_server ();
 int smtp_read_response_from_server ();
 #endif
 
-#endif
-
 extern char *progname;
 
-extern boolean timeout_flag;
+
