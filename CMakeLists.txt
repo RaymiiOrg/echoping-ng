@@ -15,6 +15,4 @@ set(PACKAGE_STRING ${PACKAGE_NAME}-${PACKAGE_VERSION})
 set(PACKAGE_TARNAME ${PACKAGE_STRING}.tar.gz)
 set(PACKAGE_URL "http://github.com/raymiiorg/echoping-ng")
 
-configure_file(compilation.h.in src/compilation.h)
-
 install(TARGETS echoping-ng DESTINATION bin)
