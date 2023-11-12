@@ -1,3 +1,5 @@
+#pragma once 
+
 /*                                   HTParse:  URL parsing in the WWW Library
    **                           HTPARSE
    **
