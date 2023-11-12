@@ -245,7 +245,7 @@ main(argc, argv)
                     PLUGINS_DIR);
             exit(0);
         case 'V':
-            printf("%s\n", COMPILATION_OPTIONS);
+            printf("unused\n");
             exit(0);
         case 'v':
             break;
