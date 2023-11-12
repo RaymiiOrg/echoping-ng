@@ -97,6 +97,8 @@ extern int sys_nerr;
 
 
 #ifndef HEADER_INCLUDED
+#define HEADER_INCLUDED
+
 typedef union _CHANNEL
 {
   FILE *fs;
