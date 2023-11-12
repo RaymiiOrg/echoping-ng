@@ -1,5 +1,8 @@
 /* $Id$ */
 
+#ifndef HEADER_INCLUDED
+#define HEADER_INCLUDED
+
 /* Settings you should not change -- see below for changeable ones */
 
 #ifdef HAVE_CONFIG_H
@@ -96,9 +99,6 @@ extern int sys_nerr;
 #endif
 
 
-#ifndef HEADER_INCLUDED
-#define HEADER_INCLUDED
-
 typedef union _CHANNEL
 {
   FILE *fs;
@@ -147,8 +147,6 @@ typedef int (*execute_f) ();
 execute_f plugin_execute;
 typedef void (*terminate_f) ();
 terminate_f plugin_terminate;
-#endif
-
 #endif
 
 struct timeval null_timeval;
@@ -231,11 +229,9 @@ int read_from_server ();
 int smtp_read_response_from_server ();
 #endif
 
+
 extern char *progname;
 
-extern boolean timeout_flag;
+// extern boolean timeout_flag;
 
-
-#ifndef HEADER_INCLUDED
-#define HEADER_INCLUDED
 #endif
