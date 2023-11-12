@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(echoping-ng 2023.01)
+project(echoping-ng VERSION 2023.01)
 
 set(CMAKE_C_STANDARD 11)
 
