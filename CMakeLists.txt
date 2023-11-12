@@ -5,8 +5,8 @@ set(CMAKE_C_STANDARD 11)
 
 add_compile_definitions(MAX_ITERATIONS=20)
 add_compile_definitions(MAX_LINE=65535)
-add_compile_definitions(VERSION=${PROJECT_VERSION})
-add_compile_definitions(VERSION=${PROJECT_VERSION})
+add_compile_definitions(VERSION="2023.01")
+add_compile_definitions(PLUGINS_DIR="plugins")
 
 
 
