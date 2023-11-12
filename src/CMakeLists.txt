@@ -6,4 +6,4 @@ set(SOURCES ${SOURCES})
 
 add_executable(${BINARY} ${SOURCES})
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE popt)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE popt m)
