@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
-project(echoping-ng)
+project(echoping-ng 2023.01)
 
 set(CMAKE_C_STANDARD 11)
 
 add_compile_definitions(MAX_ITERATIONS=20)
 add_compile_definitions(MAX_LINE=65535)
+add_compile_definitions(VERSION=${PROJECT_VERSION})
 add_compile_definitions(VERSION=${PROJECT_VERSION})
 
 
