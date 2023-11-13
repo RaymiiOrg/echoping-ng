@@ -2,15 +2,22 @@
 
 /* $Id$ */
 
-#include "echoping.h"
+#include "util.h"
+
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <math.h>
+#include <time.h>
 
 #define STATES 32
 
-#include <time.h>
-#include <ctype.h>
+struct timeval null_timeval;
+struct timeval max_timeval;
 
-char           *
-random_string(unsigned length)
+
+
+char  *random_string(unsigned length)
 {
 
     char           *state = (char *) malloc(sizeof(char) * STATES);
@@ -52,9 +59,7 @@ to_upper(char *input)
  * tvsub -- Subtract 2 timeval structs:  out = out - in. Out is assumed to be
  * >= in. Comes from the bing program. 
  */
-void
-tvsub(out, in)
-    struct timeval *out, *in;
+void tvsub(struct timeval *out,struct timeval * in)
 {
     if ((out->tv_usec -= in->tv_usec) < 0) {
         --out->tv_sec;
@@ -65,8 +70,7 @@ tvsub(out, in)
 
 /* tvadd -- Adds 2 timeval structs:  out = out + in. */
 void
-tvadd(out, in)
-    struct timeval *out, *in;
+tvadd(struct timeval *out, struct timeval *in)
 {
     if ((out->tv_usec += in->tv_usec) >= 1000000) {
         ++out->tv_sec;
@@ -76,11 +80,7 @@ tvadd(out, in)
 }
 
 /* tvavg -- Averages a timeval struct */
-void
-tvavg(out, number)
-    struct timeval *out;
-    int             number;
-{
+void tvavg(struct timeval *out, int number) {
     double          result;
     /* 
      * out->tv_sec = out->tv_sec/number; out->tv_usec =
@@ -94,12 +94,7 @@ tvavg(out, number)
 
 /* tvstddev -- Computes the standard deviation of a set of results */
 void
-tvstddev(out, number, average, results)
-    struct timeval *out;
-    int             number;
-    struct timeval  average;
-    struct result  *results;
-{
+tvstddev(struct timeval *out, int number, struct timeval average, struct result* results) {
     int             i;
     struct timeval  result = null_timeval;
     struct timeval  avg = null_timeval;
@@ -145,14 +140,7 @@ tvstddev(out, number, average, results)
  /* tvstddevavg -- Computes the average of values within a set of results where the
   * sample is within the given number of standard deviations from the average */
 /* TODO: IWBN to return the number of excluded outliers */
-void
-tvstddevavg(out, number, average, results, n_stddev)
-    struct timeval *out;        /* contains std dev on entry */
-    int             number;
-    struct timeval  average;
-    struct result  *results;
-    double          n_stddev;
-{
+void tvstddevavg(struct timeval *out, int number, struct timeval average, struct result* results, double n_stddev) {
     int             i, valid = 0;
     struct timeval  result;     /* working value */
     struct timeval  var = null_timeval; /* result accumulator */
@@ -197,9 +185,7 @@ tvstddevavg(out, number, average, results, n_stddev)
 }
 
 /* tvcmp -- Compares two timeval structs */
-int
-tvcmp(left, right)
-    struct timeval *left, *right;
+int tvcmp(struct timeval *left, struct timeval *right)
 {
     if (left->tv_sec < right->tv_sec) {
         return -1;
@@ -218,10 +204,7 @@ tvcmp(left, right)
 }
 
 /* tvmin */
-void
-tvmin(champion, challenger)
-    struct timeval *champion, *challenger;
-{
+void tvmin(struct timeval *champion, struct timeval *challenger) {
     if (tvcmp(champion, challenger) == 1) {
         champion->tv_sec = challenger->tv_sec;
         champion->tv_usec = challenger->tv_usec;
@@ -230,19 +213,14 @@ tvmin(champion, challenger)
 
 /* tvmax */
 void
-tvmax(champion, challenger)
-    struct timeval *champion, *challenger;
-{
+tvmax(struct timeval *champion, struct timeval *challenger) {
     if (tvcmp(champion, challenger) == -1) {
         champion->tv_sec = challenger->tv_sec;
         champion->tv_usec = challenger->tv_usec;
     }
 }
 
-double
-tv2double(tv)
-    struct timeval  tv;
-{
+double tv2double(struct timeval tv) {
     double          result;
     result =
         (((((double) tv.tv_sec) * 1000000.0) + (double) tv.tv_usec) / 1000000.0);
@@ -250,9 +228,7 @@ tv2double(tv)
     return result;
 }
 
-struct timeval
-double2tv(x)
-    double          x;
+struct timeval double2tv(double x)
 {
     struct timeval  result;
     result.tv_sec = (int) (x);

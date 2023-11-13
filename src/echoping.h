@@ -2,6 +2,9 @@
 
 /* $Id$ */
 
+#include <sys/time.h>
+#include <netdb.h>
+#include "bool.h"
 
 /* Settings you should not change -- see below for changeable ones */
 
@@ -14,32 +17,14 @@
 #define DEFLINE 256
 #define UDPMAX 65535
 /* Mostly for HTTP */
-#define MAXTOREAD 150000
 #ifdef SMTP
 #define MAXSMTP 1024
 #define MAXSMTPLINES 30
 #endif
 
 /* Probably too many inclusions but this is to keep 'gcc -Wall' happy... */
-#include	<stdio.h>
-#include        <stdlib.h>
-#include	<sys/types.h>
-#include	<netdb.h>
-#include	<sys/socket.h>
-#include        <netinet/tcp.h>
-#include	<netinet/in.h>
-#include	<arpa/inet.h>
-#include        <stdarg.h>
-#include        <sys/time.h>
-#include        <errno.h>
-#include        <unistd.h>
-#include        <string.h>
-#include        <signal.h>
-#include        <math.h>
-#include        <dlfcn.h>
 
-/* popt library */
-#include        <popt.h>
+#include <popt.h>
 
 #ifdef OPENSSL
 #include <openssl/crypto.h>
@@ -57,13 +42,6 @@
 #ifdef LIBIDN
 #include <stringprep.h>		/* stringprep_locale_to_utf8() */
 #include <idna.h>		/* idna_to_ascii_from_utf8() */
-#endif
-
-#ifndef FALSE
-#define FALSE 0
-#endif
-#ifndef TRUE
-#define TRUE 1
 #endif
 
 #ifndef SIGALRM			/* Linux... */
@@ -99,31 +77,7 @@ extern int sys_nerr;
 #endif
 
 
-typedef union _CHANNEL
-{
-  FILE *fs;
-#ifdef OPENSSL
-  SSL *ssl;
-#endif
-#ifdef GNUTLS
-  gnutls_session tls;
-#endif
-}
-CHANNEL;
 
-/* Do not use "short" for "boolean" because popt does not know this
-   type. On a little-endian machine without alignment issues, it may
-   work but not, for instance, on UltraSparc platforms. See for
-   instance Debian bug #254322. */
-typedef unsigned int boolean;
-
-struct result
-{
-  boolean valid;
-  struct timeval timevalue;
-};
-
-boolean timeout_flag;
 struct echoping_struct
 {
   boolean udp;			/* Use the UDP protocol (TCP is the default) */
@@ -132,25 +86,22 @@ struct echoping_struct
   boolean only_ipv6;
   boolean verbose;
 };
+
+
+char *server;
+boolean timeout_flag = TRUE;
+
 typedef struct echoping_struct echoping_options;
 #ifndef IN_PLUGIN
 /* The functions we will find in the plugin */
 /* Initializes the plugin with its arguments. Returns the port name or number or NULL if the plugin wants to use the raw interface. */
 typedef char *(*init_f) (const int argc, const char **argv,
 			 const echoping_options global_options);
-init_f plugin_init;
 typedef void (*start_f) (struct addrinfo *);
-start_f plugin_start;
 typedef void (*start_raw_f) ();
-start_raw_f plugin_raw_start;
 typedef int (*execute_f) ();
-execute_f plugin_execute;
 typedef void (*terminate_f) ();
-terminate_f plugin_terminate;
 #endif
-
-struct timeval null_timeval;
-struct timeval max_timeval;
 
 #define	ECHO_TCP_PORT	"echo"
 #define	DISCARD_TCP_PORT	"discard"
@@ -173,7 +124,6 @@ struct timeval max_timeval;
 
 #define CHARGENERATED " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefg";
 
-char *server;
 #ifdef LIBIDN
 char *locale_server, *ace_server, *utf8_server;
 #endif
@@ -181,41 +131,6 @@ char *locale_server, *ace_server, *utf8_server;
 /* My functions */
 
 /* error.c */
-void usage ();
-void err_sys (char *str, ...);
-void err_ret (char *str, ...);
-void err_quit (char *str, ...);
-char *sys_err_str ();
-/* writen.c */
-int writen ();
-/* readline.c */
-int readline ();
-#ifdef OPENSSL
-int SSL_readline ();
-#endif
-#ifdef GNUTLS
-int TLS_readline ();
-#endif
-/* util.c */
-char *random_string ();
-void tvsub ();
-void tvadd ();
-void tvavg ();
-void tvmin ();
-void tvmax ();
-int tvcmp ();
-void tvstddev ();
-void tvstddevavg ();
-double tv2double ();
-struct timeval double2tv ();
-/* http.c */
-#ifdef HTTP
-char *make_http_sendline ();
-void find_server_and_port ();
-/* This one has prototypes, for a very subtile compiler issue. */
-int read_from_server (CHANNEL fs, short ssl, boolean accept_redirects);
-#endif
-
 #ifdef ICP
 #include "icp.h"
 void *make_icp_sendline ();
@@ -223,12 +138,8 @@ int recv_icp ();
 #ifndef HTTP
 int read_from_server ();
 #endif
+
 #endif
 
-#ifdef SMTP
-int smtp_read_response_from_server ();
-#endif
-
-extern char *progname;
 
 

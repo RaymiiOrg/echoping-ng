@@ -1,4 +1,8 @@
-#include "echoping.h"
+#include "error.h"
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 /* $Id$ */
 
@@ -23,7 +27,6 @@ void
 err_ret(char *str, ...)
 {
     va_list         args;
-
     va_start(args, str);
     vfprintf(stderr, str, args);
     va_end(args);
@@ -33,7 +36,6 @@ err_ret(char *str, ...)
     fflush(stdout);
     fflush(stderr);
 
-    return;
 }
 
 /*
@@ -70,9 +72,7 @@ err_quit(char *str, ...)
  */
 
 /* VARARGS1 */
-void
-err_sys(char *str, ...)
-{
+void err_sys(char *str, ...) {
     va_list         args;
 
     va_start(args, str);
@@ -84,8 +84,7 @@ err_sys(char *str, ...)
     exit(1);
 }
 
-void
-usage(poptContext context)
+void usage(poptContext context)
 {
     poptPrintUsage(context, stderr, 0);
     fprintf(stderr, " hostname [plugin-options...]\n");
@@ -102,8 +101,7 @@ usage(poptContext context)
  * decimal value of errno to the other system. 
  */
 
-char           *
-sys_err_str()
+char *sys_err_str()
 {
     static char     msgstr[200];
 

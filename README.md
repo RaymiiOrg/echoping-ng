@@ -1,3 +1,111 @@
+# echoping-ng
+
+echoping-ng is an attempt to modernize echoping:
+
+- Make it compile with modern C compilers (C11)
+- Use a modern build system (CMake)
+- Drop support for anything that is not Linux or *BSD
+
+Possibly even:
+
+- Add more plugins
+- Add modern protocols
+- Improve defaults (use HTTP instead of echo?)
+
+This is very much a work in progress. As of 2023-11 I can compile echoping-ng and use HTTP:
+
+    ./echoping-ng -n 5 -R -h / -H raymii.org raymii.org
+
+Output:
+
+    Elapsed time: 0.043191 seconds
+    Elapsed time: 0.063264 seconds
+    Elapsed time: 0.039433 seconds
+    Elapsed time: 0.048628 seconds
+    Elapsed time: 0.050021 seconds
+    ---
+    Minimum time: 0.039433 seconds (6492 bytes per sec.)
+    Maximum time: 0.063264 seconds (4047 bytes per sec.)
+    Average time: 0.048907 seconds (5234 bytes per sec.)
+    Standard deviation: 0.008122
+    Median time: 0.048628 seconds (5264 bytes per sec.)
+
+Using the `echo` (port 7) protocol is working as well:
+
+    ./echoping-ng -n 5 127.0.0.1
+
+Output
+
+    Elapsed time: 0.002616 seconds
+    Elapsed time: 0.002139 seconds
+    Elapsed time: 0.002591 seconds
+    Elapsed time: 0.004721 seconds
+    Elapsed time: 0.006094 seconds
+    ---
+    Minimum time: 0.002139 seconds (119682 bytes per sec.)
+    Maximum time: 0.006094 seconds (42009 bytes per sec.)
+    Average time: 0.003632 seconds (70485 bytes per sec.)
+    Standard deviation: 0.001522
+    Median time: 0.002616 seconds (97859 bytes per sec.)
+
+
+All other stuff is not yet working (plugins, using CMake to find packages, SMTP)
+
+
+## Enabling echo (port 7) on Debian
+
+(via: https://unix.stackexchange.com/a/361712)
+
+For setting up a echo service in Debian, you can install xinetd with:
+
+    sudo apt install xinetd
+
+Than you have to change the `disable` directive to `no` in `/etc/xinetd.d/echo`; 
+or if the file does not exist, create it as shown here:
+
+    # default: off
+    # description: An xinetd internal service which echo's characters back to
+    # clients.
+    # This is the tcp version.
+    service echo
+    {
+    disable     = no
+    type        = INTERNAL
+    id      = echo-stream
+    socket_type = stream
+    protocol    = tcp
+    user        = root
+    wait        = no
+    }
+    
+    # This is the udp version.
+    service echo
+    {
+    disable     = yes
+    type        = INTERNAL
+    id      = echo-dgram
+    socket_type = dgram
+    protocol    = udp
+    user        = root
+    wait        = yes
+    }
+
+After setting `disable = no`, or creating the file, your restart xinetd with:
+
+    sudo systemctl restart xinetd 
+
+To test the echo TCP service:
+    
+    $nc localhost echo
+    testing...
+    testing...
+    xxxx
+    xxxx
+    ^C
+    
+
+# Original README
+
 "echoping" is a small program to test (approximatively) performances
 of a remote host by sending it TCP "echo" (or other protocol, like
 HTTP) packets.

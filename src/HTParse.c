@@ -3,6 +3,11 @@
  */
 
 #include "HTParse.h"
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <stdio.h>
+
 #define TRACE 0
 
 #define FREE(x) if (x) {free(x); x = NULL;}
