@@ -4,7 +4,7 @@
  *
  */
 
-#include "echoping.h"
+#include "smtp.h"
 
 #ifdef SMTP
 

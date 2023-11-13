@@ -5,13 +5,13 @@
 
 /* Stolen from Stevens' book */
 
-#include "echoping.h"
+#include "writen.h"
+#include <unistd.h>
+typedef unsigned int boolean;
 
-int
-writen(fd, ptr, nbytes)
-    register int    fd;
-    register char  *ptr;
-    register int    nbytes;
+extern boolean timeout_flag;
+
+int writen(register int fd, register char  *ptr, register int nbytes)
 {
     int             nleft, nwritten;
 

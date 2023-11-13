@@ -5,15 +5,13 @@
  *
  */
 
-#include "echoping.h"
+#include "readline.h"
+#include <string.h>
 
-int
-readline(fs, ptr, maxlen, ln)
-    FILE           *fs;
-    char           *ptr;
-    int             maxlen;
-    unsigned short  ln;
-{
+typedef unsigned int boolean;
+extern boolean timeout_flag;
+
+int readline(FILE *fs,char *ptr, int maxlen,unsigned short  ln) {
     int             n = 1;
     char           *rc;
     int             r;

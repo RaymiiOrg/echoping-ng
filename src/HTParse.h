@@ -1,3 +1,5 @@
+#pragma once 
+
 /*                                   HTParse:  URL parsing in the WWW Library
    **                           HTPARSE
    **
@@ -6,8 +8,8 @@
    **  Implemented by HTParse.c .
  */
 
-#include "echoping.h" 
 #include <ctype.h>
+#include "bool.h"
 
 #ifndef HTPARSE_H
 #define HTPARSE_H

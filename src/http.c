@@ -1,10 +1,16 @@
 /* $Id$ */
 
-#include "echoping.h"
+#include "http.h"
 
 #ifdef HTTP
 #include "HTParse.h"
+#include "error.h"
+#include "readline.h"
+#include <stdlib.h>
+#include <string.h>
+#include "bool.h"
 
+extern boolean timeout_flag;
 
 char            big_recvline[MAXTOREAD];
 

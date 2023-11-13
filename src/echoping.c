@@ -9,9 +9,47 @@
  *
  *  */
 
-char           *progname;
+char *progname;
 
-#include	"echoping.h"
+#include    "echoping.h"
+
+#include "error.h"
+#include "http.h"
+#include "HTParse.h"
+#include "icp.h"
+#include "readline.h"
+#include "smtp.h"
+#include "util.h"
+#include "writen.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdarg.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <math.h>
+#include <dlfcn.h>
+
+extern struct timeval null_timeval;
+extern struct timeval max_timeval;
+
+
+#ifndef IN_PLUGIN
+init_f plugin_init;
+start_f plugin_start;
+start_raw_f plugin_raw_start;
+execute_f plugin_execute;
+terminate_f plugin_terminate;
+#endif
 
 /*
  * An option to define only if you want to drive echoping from another
@@ -22,92 +60,86 @@ char           *progname;
 
 /* Global variables for main and printstats */
 
-int             return_code = 0;
-int             rc;
-unsigned int    number = 1;
-struct timeval  max, min, total, median, stddev, temp, measured;
-struct timeval  conntv, connectedtv, sendtv, recvtv;
-unsigned int    successes, attempts = 0;
-unsigned int    size = DEFLINE;
-unsigned int    j = 0;
-int             n_stddev = 0;
+int return_code = 0;
+int rc;
+unsigned int number = 1;
+struct timeval max, min, total, median, stddev, temp, measured;
+struct timeval conntv, connectedtv, sendtv, recvtv;
+unsigned int successes, attempts = 0;
+unsigned int size = DEFLINE;
+unsigned int j = 0;
+int n_stddev = 0;
 
-int             family = AF_UNSPEC;
+int family = AF_UNSPEC;
 
-struct result   results[MAX_ITERATIONS];
-struct timeval  good_results[MAX_ITERATIONS];
-extern int      tvcmp();
+struct result results[MAX_ITERATIONS];
+struct timeval good_results[MAX_ITERATIONS];
 
-int
-main(argc, argv)
-    int             argc;
-    const char     *argv[];
-{
+int main(int argc, const char *argv[]) {
+    int result;
+    int remaining = argc;
+    char **leftover;
 
-    int             result;
-    int             remaining = argc;
-    char          **leftover;
-
-    int             sockfd = -1;
+    int sockfd = -1;
     struct addrinfo hints, *res;
 #ifdef LIBIDN
     struct addrinfo hints_numeric;
 #endif
-    int             error;
-    char            hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
+    int error;
+    char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
 #ifdef NI_WITHSCOPEID
     const int       niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 #else
-    const int       niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+    const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 
-    FILE           *files = NULL;
-    CHANNEL         channel;
-    int             verbose = FALSE;
-    int             dump_config = FALSE;
-    int             module_find = FALSE;
-    int             n, nr = 0;
+    FILE *files = NULL;
+    CHANNEL channel;
+    int verbose = FALSE;
+    int dump_config = FALSE;
+    int module_find = FALSE;
+    int n, nr = 0;
 #ifdef OPENSSL
     int             sslcode;
     char            rand_file[MAX_LINE];
 #endif
-    char           *sendline, recvline[MAX_LINE + 1];
-    boolean         accept_http_redirects = FALSE;
-    char           *http_hostname = NULL;
+    char *sendline, recvline[MAX_LINE + 1];
+    boolean accept_http_redirects = FALSE;
+    char *http_hostname = NULL;
 #ifdef ICP
     char            retcode[DEFLINE];
     int             length;
 #endif
-    struct timeval  newtv, oldtv;
-    void            printstats();
+    struct timeval newtv, oldtv;
+    void printstats();
 
 #ifdef HAVE_USLEEP
     float           wait = 1.0;
 #else
-    unsigned int    wait = 1;
+    unsigned int wait = 1;
 #endif
-    unsigned char   fill = ' ';
-    char           *fill_s;
-    boolean         fill_requested = FALSE;
-    unsigned int    i = 0;
-    char           *plugin_name = NULL;
-    char           *complete_plugin_name = NULL;
-    char           *ext;
-    void           *plugin = NULL;
-    int             plugin_result = -3; /* Initialize to illegal value */
+    unsigned char fill = ' ';
+    char *fill_s;
+    boolean fill_requested = FALSE;
+    unsigned int i = 0;
+    char *plugin_name = NULL;
+    char *complete_plugin_name = NULL;
+    char *ext;
+    void *plugin = NULL;
+    int plugin_result = -3; /* Initialize to illegal value */
 
-    void            to_alarm(); /* our alarm() signal handler */
-    void            interrupted();
-    unsigned int    timeout = 10;
-    boolean         timeout_requested = 0;
-    boolean         size_requested = 0;
-    char           *url = "";
-    boolean         measure_data_transfer_only = FALSE;
+    void to_alarm(); /* our alarm() signal handler */
+    void interrupted();
+    unsigned int timeout = 10;
+    boolean timeout_requested = 0;
+    boolean size_requested = 0;
+    char *url = "";
+    boolean measure_data_transfer_only = FALSE;
 #if USE_SIGACTION
     struct sigaction mysigaction;
 #endif
 
-    char           *plugin_port_name, *port_name;
+    char *plugin_port_name, *port_name;
     boolean         plugin_raw = FALSE;
     boolean         port_to_use = USE_ECHO;
     boolean         http = 0;
@@ -123,8 +155,8 @@ main(argc, argv)
     icp_opcode      opcode = ICP_OP_QUERY;
 #endif
 
-    boolean         tcp = FALSE;
-    boolean         ssl = FALSE;
+    boolean tcp = FALSE;
+    boolean ssl = FALSE;
 
     boolean         stop_at_newlines = 1;
 
@@ -142,66 +174,57 @@ main(argc, argv)
     };
 #endif
 
-    int             priority;
-    int             priority_requested = 0;
-    int             tos;
-    int             tos_requested = 0;
-    int             protocol;
-    boolean         sctp_requested = FALSE;
-    int             sctp = 0;
+    int priority;
+    int priority_requested = 0;
+    int tos;
+    int tos_requested = 0;
+    int protocol;
+    boolean sctp_requested = FALSE;
+    int sctp = 0;
 #ifdef HAVE_TCP_INFO
     struct tcp_info tcpinfo;
     socklen_t       socket_length = sizeof(tcpinfo);
 #endif
-    char           *p;
+    char *p;
     echoping_options global_options;
 
     /* popt variables */
     const struct poptOption options[] = {
-        {"verbose", 'v', POPT_ARG_NONE, &verbose, 'v'},
-        {"dump-configuration", 'V', POPT_ARG_NONE, &dump_config, 'V',
-         "Displays echoping compiled-in configuration"},
-        {"help", '?', POPT_ARG_NONE, NULL, '?'},
-        {"size", 's', POPT_ARG_INT, &size, 's'},
-        {"number", 'n', POPT_ARG_INT, &number, 'n', "Number of iterations"},
+            {"verbose", 'v', POPT_ARG_NONE, &verbose, 'v', NULL, NULL},
+            {"dump-configuration", 'V', POPT_ARG_NONE, &dump_config, 'V', "Displays echoping compiled-in configuration", NULL},
+            {"help", '?', POPT_ARG_NONE, NULL, '?', NULL, NULL},
+            {"size", 's', POPT_ARG_INT, &size, 's', NULL, NULL},
+            {"number", 'n', POPT_ARG_INT, &number, 'n', "Number of iterations", NULL},
 #ifdef HAVE_USLEEP
-        {"wait", 'w', POPT_ARG_FLOAT, &wait, 'w',
-         "Delay between iterations"},
+            {"wait", 'w', POPT_ARG_FLOAT, &wait, 'w',
+             "Delay between iterations"},
 #else
-        {"wait", 'w', POPT_ARG_INT, &wait, 'w', "Delay between iterations"},
+            {"wait", 'w', POPT_ARG_INT, &wait, 'w', "Delay between iterations", NULL},
 #endif
-        {"discard", 'd', POPT_ARG_NONE, &discard, 'd'},
-        {"chargen", 'c', POPT_ARG_NONE, &chargen, 'c'},
-        {"http", 'h', POPT_ARG_STRING, &url, 'h'},
-        {"accept-http-redirects", 'R', POPT_ARG_NONE, &accept_http_redirects,
-         'R',
-         "Accept HTTP return codes 3xx (redirections)"},
-        {"hostname", 'H', POPT_ARG_STRING, &http_hostname, 'H',
-         "Hostname to use in HTTP Host: header"},
-        {"icp", 'i', POPT_ARG_STRING, &url, 'i',
-         "ICP protocol, for Web proxies/caches"},
-        {"udp", 'u', POPT_ARG_NONE, &udp, 'u'},
-        {"timeout", 't', POPT_ARG_INT, &timeout, 't'},
-        {"fill", 'f', POPT_ARG_STRING, &fill_s, 'f'},
-        {"smtp", 'S', POPT_ARG_NONE, &smtp, 'S'},
-        {"ssl", 'C', POPT_ARG_NONE, &ssl, 'C'},
-        {"priority", 'p', POPT_ARG_INT, &priority, 'p'},
-        {"type-of-service", 'P', POPT_ARG_INT, &tos, 'P'},
-        {"sctp", 'T', POPT_ARG_NONE, &sctp, 'T'},
-        {"check-original", 'a', POPT_ARG_NONE, NULL, 'a',
-         "For HTTP through a proxy/cache"},
-        {"ignore-cache", 'A', POPT_ARG_NONE, NULL, 'A',
-         "For HTTP through a proxy/cache"},
-        {"ipv4", '4', POPT_ARG_NONE, NULL, '4'},
-        {"ipv6", '6', POPT_ARG_NONE, NULL, '6'},
-        {"module", 'm', POPT_ARG_STRING, &plugin_name, 'm',
-         "Loads the given plugin"},
-        {"data-only", 'D', POPT_ARG_NONE, NULL, 'D'},
-        {"num-std-dev", 'N', POPT_ARG_INT, &n_stddev, 'N',
-         "Number of standard deviations to classify outliers"},
-        POPT_TABLEEND
+            {"discard", 'd', POPT_ARG_NONE, &discard, 'd', NULL, NULL},
+            {"chargen", 'c', POPT_ARG_NONE, &chargen, 'c', NULL, NULL},
+            {"http", 'h', POPT_ARG_STRING, &url, 'h', NULL, NULL},
+            {"accept-http-redirects", 'R', POPT_ARG_NONE, &accept_http_redirects, 'R', "Accept HTTP return codes 3xx (redirections)", NULL},
+            {"hostname", 'H', POPT_ARG_STRING, &http_hostname, 'H', "Hostname to use in HTTP Host: header", NULL},
+            {"icp", 'i', POPT_ARG_STRING, &url, 'i',  "ICP protocol, for Web proxies/caches", NULL},
+            {"udp", 'u', POPT_ARG_NONE, &udp, 'u', NULL, NULL},
+            {"timeout", 't', POPT_ARG_INT, &timeout, 't', NULL, NULL},
+            {"fill", 'f', POPT_ARG_STRING, &fill_s, 'f', NULL, NULL},
+            {"smtp", 'S', POPT_ARG_NONE, &smtp, 'S', NULL, NULL},
+            {"ssl", 'C', POPT_ARG_NONE, &ssl, 'C', NULL, NULL},
+            {"priority", 'p', POPT_ARG_INT, &priority, 'p', NULL, NULL},
+            {"type-of-service", 'P', POPT_ARG_INT, &tos, 'P', NULL, NULL},
+            {"sctp", 'T', POPT_ARG_NONE, &sctp, 'T', NULL, NULL},
+            {"check-original", 'a', POPT_ARG_NONE, NULL, 'a', "For HTTP through a proxy/cache", NULL},
+            {"ignore-cache", 'A', POPT_ARG_NONE, NULL, 'A', "For HTTP through a proxy/cache", NULL},
+            {"ipv4", '4', POPT_ARG_NONE, NULL, '4', NULL, NULL},
+            {"ipv6", '6', POPT_ARG_NONE, NULL, '6', NULL, NULL},
+            {"module", 'm', POPT_ARG_STRING, &plugin_name, 'm', "Loads the given plugin", NULL},
+            {"data-only", 'D', POPT_ARG_NONE, NULL, 'D', NULL, NULL},
+            {"num-std-dev", 'N', POPT_ARG_INT, &n_stddev, 'N', "Number of standard deviations to classify outliers", NULL},
+            POPT_TABLEEND
     };
-    poptContext     poptcon;
+    poptContext poptcon;
 
     global_options.udp = FALSE;
     global_options.verbose = FALSE;
@@ -237,148 +260,145 @@ main(argc, argv)
         }
         remaining--;
         switch ((char) result) {
-        case '?':
-            poptPrintHelp(poptcon, stdout, 0);
-            fprintf(stdout, " hostname [plugin-options...]\n");
-            fprintf(stdout,
-                    "  (You can get a list of available plugins with \"ls %s\")\n",
-                    PLUGINS_DIR);
-            exit(0);
-        case 'V':
-            printf("%s\n", COMPILATION_OPTIONS);
-            exit(0);
-        case 'v':
-            break;
-        case 'r':
-            break;
-        case 'u':
-            break;
-        case 'C':
-            break;
-        case 'd':
-            strcpy(port_name, DISCARD_TCP_PORT);
-            port_to_use = USE_DISCARD;
-            break;
-        case 'c':
-            strcpy(port_name, CHARACTER_GENERATOR_TCP_PORT);
-            port_to_use = USE_CHARGEN;
-            stop_at_newlines = 0;
-            break;
-        case 'i':
-            remaining--;
-            strcpy(port_name, DEFAULT_ICP_UDP_PORT);
-            port_to_use = USE_ICP;
-            udp = 1;
-            icp = 1;
-            break;
-        case 'h':
-            remaining--;
-            strcpy(port_name, DEFAULT_HTTP_TCP_PORT);
-            port_to_use = USE_HTTP;
-            http = 1;
-            break;
-        case 'R':
-            accept_http_redirects = TRUE;
-            break;
-        case 'H':
-            remaining--;
-            break;
-        case 'a':
-            nocache = 1;
-            break;
-        case 'A':
-            nocache = 2;
-            break;
-        case 'f':
-            remaining--;
-            if (strlen(fill_s) > 1)
-                err_quit("Argument --fill should be a one-character string");
-            fill = fill_s[0];
-            fill_requested = 1;
-            break;
-        case 'S':
-            strcpy(port_name, "smtp");
-            port_to_use = USE_SMTP;
-            break;
-        case 'D':
-            measure_data_transfer_only = TRUE;
-            break;
-        case 'N':
-            remaining--;
-            break;
-        case 'p':
-            remaining--;
-            priority_requested = 1;
-            break;
-        case 'P':
-            remaining--;
-            tos_requested = 1;
-            break;
-        case 'T':
-            sctp_requested = TRUE;
-            break;
-        case 's':
-            remaining--;
-            if (size > MAX_LINE) {
-                (void) fprintf(stderr,
-                               "%s: packet size too large, max is %d.\n",
-                               progname, MAX_LINE);
-                exit(1);
-            }
-            if (size <= 0) {
-                (void) fprintf(stderr, "%s: illegal packet size.\n", progname);
-                exit(1);
-            }
-            size_requested = 1;
-            break;
-        case 't':
-            remaining--;
-            timeout_requested = 1;
-            if (size <= 0) {
-                (void) fprintf(stderr, "%s: illegal timeout.\n", progname);
-                exit(1);
-            }
-            break;
-        case 'n':
-            remaining--;
-            if (number > MAX_ITERATIONS) {
-                (void) fprintf(stderr,
-                               "%s: number of iterations too large, max is %d.\n",
-                               progname, MAX_ITERATIONS);
-                exit(1);
-            }
-            if (number <= 0) {
-                (void) fprintf(stderr,
-                               "%s: illegal number of iterations.\n", progname);
-                exit(1);
-            }
-            break;
-        case 'w':
-            remaining--;
-            if (wait <= 0)
-                /* 
-                 * atoi returns zero when there is an error.
-                 * So we cannot use '-w 0' to specify no
-                 * waiting.
-                 */
-            {
-                (void) fprintf(stderr, "%s: illegal waiting time.\n", progname);
-                exit(1);
-            }
-            break;
-        case '4':
-            family = AF_INET;
-            break;
-        case '6':
-            family = AF_INET6;
-            break;
-        case 'm':
-            remaining--;
-            module_find = TRUE;
-            break;
-        default:
-            printf("Unknown character option %d (%c)", result, (char) result);
-            usage(poptcon);
+            case '?':
+                poptPrintHelp(poptcon, stdout, 0);
+                fprintf(stdout, " hostname [plugin-options...]\n");
+                fprintf(stdout,
+                        "  (You can get a list of available plugins with \"ls %s\")\n",
+                        PLUGINS_DIR);
+                exit(0);
+            case 'V':
+                printf("unused\n");
+                exit(0);
+            case 'v':
+            case 'r':
+            case 'u':
+            case 'C':
+                break;
+            case 'd':
+                strcpy(port_name, DISCARD_TCP_PORT);
+                port_to_use = USE_DISCARD;
+                break;
+            case 'c':
+                strcpy(port_name, CHARACTER_GENERATOR_TCP_PORT);
+                port_to_use = USE_CHARGEN;
+                stop_at_newlines = 0;
+                break;
+            case 'i':
+                remaining--;
+                strcpy(port_name, DEFAULT_ICP_UDP_PORT);
+                port_to_use = USE_ICP;
+                udp = 1;
+                icp = 1;
+                break;
+            case 'h':
+                remaining--;
+                strcpy(port_name, DEFAULT_HTTP_TCP_PORT);
+                port_to_use = USE_HTTP;
+                http = 1;
+                break;
+            case 'R':
+                accept_http_redirects = TRUE;
+                break;
+            case 'H':
+                remaining--;
+                break;
+            case 'a':
+                nocache = 1;
+                break;
+            case 'A':
+                nocache = 2;
+                break;
+            case 'f':
+                remaining--;
+                if (strlen(fill_s) > 1)
+                    err_quit("Argument --fill should be a one-character string");
+                fill = fill_s[0];
+                fill_requested = 1;
+                break;
+            case 'S':
+                strcpy(port_name, "smtp");
+                port_to_use = USE_SMTP;
+                break;
+            case 'D':
+                measure_data_transfer_only = TRUE;
+                break;
+            case 'N':
+                remaining--;
+                break;
+            case 'p':
+                remaining--;
+                priority_requested = 1;
+                break;
+            case 'P':
+                remaining--;
+                tos_requested = 1;
+                break;
+            case 'T':
+                sctp_requested = TRUE;
+                break;
+            case 's':
+                remaining--;
+                if (size > MAX_LINE) {
+                    (void) fprintf(stderr,
+                                   "%s: packet size too large, max is %d.\n",
+                                   progname, MAX_LINE);
+                    exit(1);
+                }
+                if (size <= 0) {
+                    (void) fprintf(stderr, "%s: illegal packet size.\n", progname);
+                    exit(1);
+                }
+                size_requested = 1;
+                break;
+            case 't':
+                remaining--;
+                timeout_requested = 1;
+                if (size <= 0) {
+                    (void) fprintf(stderr, "%s: illegal timeout.\n", progname);
+                    exit(1);
+                }
+                break;
+            case 'n':
+                remaining--;
+                if (number > MAX_ITERATIONS) {
+                    (void) fprintf(stderr,
+                                   "%s: number of iterations too large, max is %d.\n",
+                                   progname, MAX_ITERATIONS);
+                    exit(1);
+                }
+                if (number <= 0) {
+                    (void) fprintf(stderr,
+                                   "%s: illegal number of iterations.\n", progname);
+                    exit(1);
+                }
+                break;
+            case 'w':
+                remaining--;
+                if (wait <= 0)
+                    /*
+                     * atoi returns zero when there is an error.
+                     * So we cannot use '-w 0' to specify no
+                     * waiting.
+                     */
+                {
+                    (void) fprintf(stderr, "%s: illegal waiting time.\n", progname);
+                    exit(1);
+                }
+                break;
+            case '4':
+                family = AF_INET;
+                break;
+            case '6':
+                family = AF_INET6;
+                break;
+            case 'm':
+                remaining--;
+                module_find = TRUE;
+                break;
+            default:
+                printf("Unknown character option %d (%c)", result, (char) result);
+                usage(poptcon);
         }
     }
     if (udp && ((port_to_use == USE_CHARGEN) ||
@@ -400,7 +420,7 @@ main(argc, argv)
                        progname);
         exit(1);
     }
-#if ! (defined(OPENSSL) || defined(GNUTLS))
+#if !(defined(OPENSSL) || defined(GNUTLS))
     if (ssl) {
         (void) fprintf(stderr, "%s: not compiled with SSL/TLS support.\n", progname);
         exit(1);
@@ -488,8 +508,8 @@ main(argc, argv)
                     "'dpkg -s echoping | grep Recommends' to know them.\n\n");
 #endif
             err_sys
-                ("Cannot load \"%s\" (I tried the short name, then the complete name in \"%s\"): %s",
-                 plugin_name, PLUGINS_DIR, dlerror());
+                    ("Cannot load \"%s\" (I tried the short name, then the complete name in \"%s\"): %s",
+                     plugin_name, PLUGINS_DIR, dlerror());
         }
         plugin_init = dlsym(plugin, "init");
         if (!plugin_init) {
@@ -506,7 +526,7 @@ main(argc, argv)
         else
             global_options.only_ipv6 = 0;
         plugin_port_name =
-            plugin_init(remaining, (const char **) leftover, global_options);
+                plugin_init(remaining, (const char **) leftover, global_options);
         if (plugin_port_name != NULL) {
             strcpy(port_name, plugin_port_name);
             plugin_raw = FALSE;
@@ -847,28 +867,28 @@ main(argc, argv)
             if (!plugin) {
                 if (tcp) {
                     printf
-                        ("Trying to connect to internet address %s %s to transmit %u bytes...\n",
-                         hbuf, pbuf, n);
+                            ("Trying to connect to internet address %s %s to transmit %u bytes...\n",
+                             hbuf, pbuf, n);
                 }
 #ifdef ICP
-                if (icp) {
-                    printf
-                        ("Trying to send an ICP packet of %u bytes to the internet address %s...\n",
-                         length, hbuf);
-                }
+                    if (icp) {
+                        printf
+                            ("Trying to send an ICP packet of %u bytes to the internet address %s...\n",
+                             length, hbuf);
+                    }
 #endif
                 else {
                     printf
-                        ("Trying to send %u bytes to internet address %s...\n",
-                         size, hbuf);
+                            ("Trying to send %u bytes to internet address %s...\n",
+                             size, hbuf);
                 }
             } else {
                 if (plugin_raw)
                     printf("Trying to call plugin %s...\n", plugin_name);
                 else
                     printf
-                        ("Trying to call plugin %s for internet address %s %s...\n",
-                         plugin_name, hbuf, pbuf);
+                            ("Trying to call plugin %s for internet address %s %s...\n",
+                             plugin_name, hbuf, pbuf);
             }
         }
 #ifdef FLUSH_OUTPUT
@@ -942,8 +962,8 @@ main(argc, argv)
                         if (verbose) {
                             printf("Connected...\n");
                             printf
-                                ("TCP Latency: %d.%06d seconds\n",
-                                 (int) temp.tv_sec, (int) temp.tv_usec);
+                                    ("TCP Latency: %d.%06d seconds\n",
+                                     (int) temp.tv_sec, (int) temp.tv_usec);
                         }
                     }
                 }
@@ -1035,8 +1055,8 @@ main(argc, argv)
                             if ((nr < 0 || nr != n)
                                 && timeout_flag) {
                                 printf
-                                    ("Timeout while writing (%d byte(s) written so far)\n",
-                                     (nr == -1) ? 0 : nr);
+                                        ("Timeout while writing (%d byte(s) written so far)\n",
+                                         (nr == -1) ? 0 : nr);
                                 nr = n;
                                 close(sockfd);
                                 continue;
@@ -1091,23 +1111,23 @@ main(argc, argv)
                             err_sys("sendto error on socket");
                     } else
 #endif
-                        /* 
-                         * if (sendto(sockfd, sendline, n, 0,
-                         * &serv_addr, sizeof(serv_addr)) != n)
-                         * err_sys("sendto error on socket");
-                         */
+                    /*
+                     * if (sendto(sockfd, sendline, n, 0,
+                     * &serv_addr, sizeof(serv_addr)) != n)
+                     * err_sys("sendto error on socket");
+                     */
                     if (send(sockfd, sendline, n, 0) != n)
                         err_sys("send error on socket");
                 }
                 if (verbose) {
                     (void) gettimeofday(&sendtv, (struct timezone *)
-                                        NULL);
+                            NULL);
 #ifdef ICP
                     if (icp)
                         printf("Sent (%d bytes)...\n", length);
                     else
 #endif
-                        printf("Sent (%d bytes)...\n", n);
+                    printf("Sent (%d bytes)...\n", n);
 
 #ifdef FLUSH_OUTPUT
                     if (fflush((FILE *) NULL) != 0) {
@@ -1117,34 +1137,34 @@ main(argc, argv)
                 }
             }
             if (tcp && !discard) {
-                fd_set          mask;
-                int             n = 0;
+                fd_set mask;
+                int n = 0;
 
                 FD_ZERO(&mask);
 
                 if (!(http && ssl))
                     n = fileno(files);
 #ifdef OPENSSL
-                else {
-                    n = SSL_get_fd(sslh);
-                }
+                    else {
+                        n = SSL_get_fd(sslh);
+                    }
 #endif
 #ifdef GNUTLS
-                else
-                {
-                    n = sockfd;
-                }
+                    else
+                    {
+                        n = sockfd;
+                    }
 #endif
                 FD_SET(n, &mask);
                 if (select(n + 1, &mask, 0, 0, NULL) > 0) {
                     (void) gettimeofday(&recvtv, (struct timezone *)
-                                        NULL);
+                            NULL);
                     temp = recvtv;
                     tvsub(&temp, &sendtv);
                     if (verbose)
                         printf
-                            ("Application Latency: %d.%06d seconds\n",
-                             (int) temp.tv_sec, (int) temp.tv_usec);
+                                ("Application Latency: %d.%06d seconds\n",
+                                 (int) temp.tv_sec, (int) temp.tv_usec);
                 }
             }
             if ((port_to_use == USE_ECHO) || (port_to_use == USE_CHARGEN)
@@ -1202,27 +1222,27 @@ main(argc, argv)
                         }
                     } else {
 #endif
-                        nr = recv(sockfd, recvline, n, 0);
-                        /* 
-                         * nr = recvfrom(sockfd, recvline, n, 0,
-                         * (struct sockaddr *) 0, (int *) 0);
-                         * recvfrom fails on SunOS on connected
-                         * sockets.
-                         */
-                        /* 
-                         * Todo: in UDP, we should loop to read: we
-                         * can have several reads necessary.
-                         */
-                        if ((nr < 0) && (errno == EINTR)
-                            && (timeout_flag)) {
-                            nr = n;
-                            printf("Timeout\n");
+                    nr = recv(sockfd, recvline, n, 0);
+                    /*
+                     * nr = recvfrom(sockfd, recvline, n, 0,
+                     * (struct sockaddr *) 0, (int *) 0);
+                     * recvfrom fails on SunOS on connected
+                     * sockets.
+                     */
+                    /*
+                     * Todo: in UDP, we should loop to read: we
+                     * can have several reads necessary.
+                     */
+                    if ((nr < 0) && (errno == EINTR)
+                        && (timeout_flag)) {
+                        nr = n;
+                        printf("Timeout\n");
 #ifdef FLUSH_OUTPUT
-                            if (fflush((FILE *) NULL) != 0) {
-                                err_sys("I cannot flush");
-                            }
-#endif
+                        if (fflush((FILE *) NULL) != 0) {
+                            err_sys("I cannot flush");
                         }
+#endif
+                    }
 #ifdef ICP
                     }
 #endif
@@ -1236,8 +1256,8 @@ main(argc, argv)
                          */
                     {
                         printf
-                            ("Timeout while reading (%d byte(s) read)\n",
-                             (nr == -1) ? 0 : nr);
+                                ("Timeout while reading (%d byte(s) read)\n",
+                                 (nr == -1) ? 0 : nr);
                         nr = n;
 #ifdef FLUSH_OUTPUT
                         if (fflush((FILE *) NULL) != 0) {
@@ -1249,8 +1269,8 @@ main(argc, argv)
                     }
                     if (nr < 0 || nr != n)
                         err_sys
-                            ("readline error: %d bytes read, %d bytes requested",
-                             nr, n);
+                                ("readline error: %d bytes read, %d bytes requested",
+                                 nr, n);
                 } else
                     /* This is probably HTTP */
                 {
@@ -1261,8 +1281,8 @@ main(argc, argv)
                      */
                     if ((errno == EINTR) && timeout_flag) {
                         printf
-                            ("Timeout while reading (%d byte(s) read so far)\n",
-                             (nr == -1) ? 0 : nr);
+                                ("Timeout while reading (%d byte(s) read so far)\n",
+                                 (nr == -1) ? 0 : nr);
 #ifdef FLUSH_OUTPUT
                         if (fflush((FILE *) NULL) != 0) {
                             err_sys("I cannot flush");
@@ -1307,7 +1327,7 @@ main(argc, argv)
                 shutdown(sockfd, SHUT_RDWR);
             else
 #endif
-                fclose(channel.fs);
+            fclose(channel.fs);
         }
         close(sockfd);
 
@@ -1409,10 +1429,9 @@ main(argc, argv)
 }
 
 void
-printstats()
-{
+printstats() {
 
-    int             i;
+    int i;
 
     /* if ((number > 1) && ((!udp) || (successes > 0))) { */
     if (successes > 1) {
@@ -1470,9 +1489,9 @@ printstats()
         if (n_stddev) {
             tvstddevavg(&stddev, successes, total, results, (double) n_stddev);
             printf
-                ("Average of values within %d standard deviation%s: %d.%06d\n",
-                 n_stddev, (n_stddev == 1 ? "" : "s"),
-                 (int) stddev.tv_sec, (int) stddev.tv_usec);
+                    ("Average of values within %d standard deviation%s: %d.%06d\n",
+                     n_stddev, (n_stddev == 1 ? "" : "s"),
+                     (int) stddev.tv_sec, (int) stddev.tv_usec);
         }
     }
 }
@@ -1487,15 +1506,13 @@ printstats()
  */
 
 void
-to_alarm()
-{
+to_alarm() {
     /* printf ("DEBUG: timeout handler called\n"); */
     timeout_flag = 1;           /* set flag for function above */
 }
 
 void
-interrupted()
-{
+interrupted() {
     printf("Interrupted by user\n");
     printstats();
     exit(1);

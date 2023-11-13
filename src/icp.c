@@ -6,7 +6,7 @@
  *
  */
 
-#include "echoping.h"
+#include "icp.h"
 
 #ifdef ICP
 
