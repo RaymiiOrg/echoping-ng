@@ -23,7 +23,7 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ls -larSh #ctest -C ${{env.BUILD_TYPE}}
+      run: ls -larSh src #ctest -C ${{env.BUILD_TYPE}}
 
 
     - name: Upload  binary
