@@ -1,10 +1,6 @@
 name: CMake 
 
-on:
-  push:
-    branches: [ "ci-test" ]
-  pull_request:
-    branches: [ "master" ]
+on: [push, pull_request]
 
 env:
   BUILD_TYPE: Release
@@ -28,4 +24,14 @@ jobs:
     - name: Test
       working-directory: ${{github.workspace}}/build
       run: ls -larSh #ctest -C ${{env.BUILD_TYPE}}
+
+
+    - name: Upload  binary
+      uses: actions/upload-artifact@v1
+      with:
+        name: echoping-ng
+        path: ${{runner.workspace}}/build/src/echoping-ng 
+      
+      
+
 
